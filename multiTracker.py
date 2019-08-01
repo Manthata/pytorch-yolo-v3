@@ -43,12 +43,37 @@ def createTrackerByName(trackerType):
             print(t)
 
     return tracker
-# Return true if line segments AB and CD intersect
-def intersect(A,B,C,D):
-        return ccw(A,C,D) != ccw(B,C,D) and ccw(A,B,C) != ccw(A,B,D)
 
-def ccw(A,B,C):
-        return (C[1]-A[1]) * (B[0]-A[0]) > (B[1]-A[1]) * (C[0]-A[0])
+def bb_intersection_over_union(boxA, boxB):
+    # determine the (x, y)-coordinates of the intersection rectangle
+    xA = max(boxA[0], boxB[0])
+    print(xA)
+    yA = max(boxA[1], boxB[1])
+    print(yA)
+    xB = min(boxA[2], boxB[2])
+    print(xB)
+    yB = min(boxA[3], boxB[3])
+    print(yB)
+
+    # compute the area of intersection rectangle
+    interArea = abs(max((xB - xA, 0)) * max((yB - yA), 0))
+    #print(interArea)
+    if interArea == 0:
+        return 0
+    # compute the area of both the prediction and ground-truth
+    # rectangles
+    boxAArea = abs((boxA[2] - boxA[0]) * (boxA[3] - boxA[1]))
+    boxBArea = abs((boxB[2] - boxB[0]) * (boxB[3] - boxB[1]))
+    print(boxAArea, boxBArea)
+
+    # compute the intersection over union by taking the intersection
+    # area and dividing it by the sum of prediction + ground-truth
+    # areas - the interesection area
+    iou = interArea / float(boxAArea + boxBArea - interArea)
+
+    # return the intersection over union value
+    return iou
+    
 
 
 
@@ -157,6 +182,8 @@ if __name__ == '__main__':
         if not success:
           break
         bboxes = []
+        rects= []
+
 
 
         ##########################
@@ -189,18 +216,27 @@ if __name__ == '__main__':
 
             #print("output: ", output)
             #print("output: ", output.shape)
+            classes = load_classes('data/coco.names')
 
             for i in output:
                 x0 = i[1].int()
                 y0 = i[2].int()
                 x1 = i[3].int()
                 y1 = i[4].int()
+                cls = i[-1].int()
+                label = "{0}".format(classes[cls])
                 #bbox = (x0, y0, x1, y1)
                 #bboxes.append(bbox)
                 #print(bbox)
                 w = x1 - x0
                 h = y1 - y0
-                bboxes.append((x0, y0, w, h))
+                print(x0, y0, x1, y1) 
+                
+                
+                
+                if label == ("person" or "car"):
+                    bboxes.append((x0, y0, w, h))
+                    
                 #print(bboxes)
 
             # Create MultiTracker object
@@ -216,21 +252,37 @@ if __name__ == '__main__':
 
         # get updated location of objects in subsequent frames
         success, boxes = multiTracker.update(frame)
+      
+       
+
         #print("update boxes: ", boxes)
 
         # draw tracked objects
         for i, newbox in enumerate(boxes):
-            p1 = (int(newbox[0]), int(newbox[1]))
-            p2 = (int(newbox[0] + newbox[2]), int(newbox[1] + newbox[3]))
-            cv2.rectangle(frame, p1, p2, colors[i], 2, 1)
-            #print("rectangle point: ", p1, p2)
-            cv2.line(frame, (0, H // 2), (W, H // 2), (0, 255, 255), 2)
-            if intersect(p1, p2, line[0], line[1]):
-                counter += 1
-
-        # draw counter
+            (xx0, yy0)= (int(newbox[0]), int(newbox[1]))
+            print(xx0, yy0)
+            (xx2, yy2) = (int(newbox[0] + newbox[2]), int(newbox[1] + newbox[3]))
+            print(xx2, yy2)
+            cv2.rectangle(frame, (xx0, yy0), (xx2, yy2), colors[i], 2, 1)
+            BoxA =[0,360//100, 1280//100,0]
+            BoxB = [xx0//100, yy0//100, xx2//100, yy2//100] 
+           
+            x1 = 0
+            y1 = 360
+            x2 = 1280
+            y2 = 0
+            cv2.rectangle(frame, (x1, y1), (x2, y2), colors[i], 2,1) 
+            # compute the intersection over union and display it
+            iou = bb_intersection_over_union(BoxA, BoxB)
+            cv2.putText(frame, "IoU: {:.4f}".format(iou), (10, 30), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+            
+            
+                
+              
+       
         cv2.putText(frame, str(counter), (100,200), cv2.FONT_HERSHEY_DUPLEX, 5.0, (0, 255, 255), 10)
-        counter += 1
+        #counter += 1
         cv2.imshow('MultiTracker', frame)
 
         frames+=1
