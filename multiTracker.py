@@ -61,7 +61,7 @@ if __name__ == '__main__':
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     params = {
-        "video": "video.avi", # Video to run detection upon
+        "video": "small_ex01.avi", # Video to run detection upon
         "dataset": "pasacal", # Dataset on which the network has been trained
         "confidence": 0.5, # Object Confidence to filter predictions
         "nms_thresh": 0.4, # NMS Threshold
@@ -109,10 +109,14 @@ if __name__ == '__main__':
     trackerType = "CSRT"
 
     # Set video to load
-    videoPath = "videos/run.mp4"
+    videoPath = params["video"]
 
     # Create a video capture object to read videos
-    cap = cv2.VideoCapture(0)
+    cap = cv2.VideoCapture(videoPath)
+
+    # Writer codes
+    fourcc = cv2.VideoWriter_fourcc(*'XVID')
+    out = cv2.VideoWriter('output.mp4',fourcc, 20.0, (640,480))
 
     # Read first frame
     success, frame = cap.read()
@@ -157,6 +161,8 @@ if __name__ == '__main__':
         success, frame = cap.read()
         if not success:
           break
+        
+        print("frames: ", frames)
         bboxes = []
 
 
@@ -164,7 +170,7 @@ if __name__ == '__main__':
         # detection
 
 
-        if frames%2==1:
+        if frames==0:
             img, orig_im, dim = video_demo.prep_image(frame, inp_dim)
             im_dim = torch.FloatTensor(dim).repeat(1,2)
             im_dim = im_dim.to(device)
@@ -188,8 +194,6 @@ if __name__ == '__main__':
                 output[i, [1,3]] = torch.clamp(output[i, [1,3]], 0.0, im_dim[i,0])
                 output[i, [2,4]] = torch.clamp(output[i, [2,4]], 0.0, im_dim[i,1])
 
-            #print("output: ", output)
-            #print("output: ", output.shape)
             classes = load_classes('data/coco.names')
 
             for i in output:
@@ -199,14 +203,10 @@ if __name__ == '__main__':
                 y1 = i[4].int()
                 cls = i[-1].int()
                 label = "{0}".format(classes[cls])
-                #bbox = (x0, y0, x1, y1)
-                #bboxes.append(bbox)
-                #print(bbox)
                 w = x1 - x0
                 h = y1 - y0
-                if label == "person":
+                if label == "person" or "car":
                     bboxes.append((x0, y0, w, h))
-                #print(bboxes)
 
             # Create MultiTracker object
             multiTracker = cv2.MultiTracker_create()
@@ -221,21 +221,15 @@ if __name__ == '__main__':
 
         # get updated location of objects in subsequent frames
         success, boxes = multiTracker.update(frame)
-        print("-------------")
-        print("update boxes: ", boxes)
 
         # draw tracked objects
         for i, newbox in enumerate(boxes):
-            print("  i: ", i)
-            print("  newbox: ", newbox)
             p1 = (int(newbox[0]), int(newbox[1]))
             p2 = (int(newbox[0] + newbox[2]), int(newbox[1] + newbox[3]))
             previous_p1 = ()
             previous_p2 = ()
 
-
             cv2.rectangle(frame, p1, p2, colors[i], 2, 1)
-            #print("rectangle point: ", p1, p2)
             cv2.line(frame, (0, H // 2), (W, H // 2), (0, 255, 255), 2)
             
             if previous_boxes != ():
@@ -248,11 +242,13 @@ if __name__ == '__main__':
         previous_boxes = boxes
         # draw counter
         cv2.putText(frame, str(counter), (100,200), cv2.FONT_HERSHEY_DUPLEX, 5.0, (0, 255, 255), 10)
-        #counter += 1
+        
+        # write the frame
+        out.write(frame)
+
         cv2.imshow('MultiTracker', frame)
 
         frames+=1
-        #print("frames>>>>>", frames)
 
         # quit on ESC button
         if cv2.waitKey(1) & 0xFF == 27:  # Esc pressed
