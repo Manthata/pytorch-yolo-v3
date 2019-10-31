@@ -112,7 +112,8 @@ if __name__ == '__main__':
     videoPath = params["video"]
 
     # Create a video capture object to read videos
-    cap = cv2.VideoCapture(videoPath)
+    #cap = cv2.VideoCapture(videoPath)
+    cap = cv2.VideoCapture(0)
 
     # Writer codes
     fourcc = cv2.VideoWriter_fourcc(*'XVID')
